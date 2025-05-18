@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Bayes' Theorem Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.dom.min.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      html {
+        height: 100%;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        margin: 0;
+        background-color: #f3f4f6; /* Tailwind gray-100 */
+        padding: 1rem;
+        box-sizing: border-box;
+        overflow-x: hidden;
+      }
+      .title {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #111827;
+        margin-bottom: 1rem;
+        text-align: center;
+        width: 100%;
+        flex-shrink: 0;
+      }
+      .main-content-area {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        max-width: 1400px;
+        gap: 1rem;
+        flex: 1;
+        overflow: hidden;
+      }
+      .left-column {
+        width: 30%;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        overflow-y: auto;
+        max-height: 100%;
+      }
+      .right-column {
+        width: 70%;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        align-items: center;
+        overflow-y: auto;
+        max-height: 100%;
+      }
+      /* Common card styling */
+      .card {
+        padding: 1rem;
+        background-color: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        width: 100%;
+        flex-shrink: 0;
+      }
+      .controls-container {
+        /* Inherits .card styling */
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: stretch;
+        gap: 0.75rem;
+      }
+      .input-group {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .input-group label {
+        margin-bottom: 0.25rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #374151;
+      }
+      .input-group input[type="number"],
+      .input-group input[type="range"] {
+        padding: 0.5rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      #formula-container {
+        /* Inherits .card styling but with specific padding/text */
+        padding: 0.75rem 1rem;
+        text-align: center;
+        font-size: 1rem;
+        color: #374151;
+        line-height: 1.6;
+        max-width: 600px;
+      }
+      #formula-container .formula-fraction {
+        display: inline-block;
+        text-align: center;
+        vertical-align: middle;
+      }
+      #formula-container .numerator {
+        border-bottom: 1.5px solid #374151;
+        padding-bottom: 0.2rem;
+        margin-bottom: 0.2rem;
+      }
+      #formula-container .denominator {
+        padding-top: 0.2rem;
+      }
+      #formula-container .value {
+        font-weight: 700;
+      }
+      #canvas-card {
+        /* New container for the canvas to give it card styling */
+        /* Inherits .card styling */
+        width: 100%;
+        max-width: 600px; /* Match formula container max-width */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-grow: 1;
+        min-height: 0;
+        padding: 1rem; /* Add padding to the card */
+      }
+      #canvas-container {
+        /* Inner container for p5 canvas placement */
+        width: 100%;
+        max-width: 400px; /* Max size of the actual p5 canvas */
+        aspect-ratio: 1 / 1;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        /* No border/shadow here, it's on #canvas-card */
+      }
+      .results-container {
+        /* Inherits .card styling */
+        text-align: center;
+      }
+      .results-container p {
+        font-size: 0.9rem;
+        color: #1f2937;
+        margin: 0.3rem 0;
+      }
+      .results-container strong {
+        font-weight: 600;
+      }
+      input[type="range"] {
+        accent-color: #3b82f6; /* Default P(H|E) highlight color */
+      }
+
+      /* Responsive adjustments for smaller screens */
+      @media (max-width: 1024px) {
+        .main-content-area {
+          flex-direction: column;
+          align-items: center;
+          overflow: visible;
+          flex: 0 1 auto;
+        }
+        .left-column,
+        .right-column {
+          width: 100%;
+          max-width: 550px;
+          overflow-y: visible;
+          max-height: none;
+        }
+        #canvas-card {
+          flex-grow: 0; /* Don't grow when stacked */
+        }
+        #canvas-container {
+          width: 90%;
+        }
+      }
+      @media (max-width: 768px) {
+        .title {
+          font-size: 1.5rem;
+        }
+        .card,
+        #formula-container,
+        #canvas-card,
+        .results-container {
+          /* Apply to all cards */
+          padding: 0.75rem;
+        }
+        #formula-container {
+          font-size: 0.9rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1 class="title">Interactive Bayes' Theorem Visualizer</h1>
+
+    <div class="main-content-area">
+      <div class="left-column">
+        <div class="controls-container card">
+          <div class="input-group">
+            <label for="pH">P(H) - Prior Probability of Hypothesis:</label>
+            <input
+              type="range"
+              id="pHSlider"
+              min="0.01"
+              max="0.99"
+              value="0.2"
+              step="0.01"
+            />
+            <input
+              type="number"
+              id="pH"
+              min="0.01"
+              max="0.99"
+              value="0.2"
+              step="0.01"
+            />
+          </div>
+          <div class="input-group">
+            <label for="pEH"
+              >P(E|H) - Likelihood (Evidence if H is true):</label
+            >
+            <input
+              type="range"
+              id="pEHSlider"
+              min="0.01"
+              max="0.99"
+              value="0.8"
+              step="0.01"
+            />
+            <input
+              type="number"
+              id="pEH"
+              min="0.01"
+              max="0.99"
+              value="0.8"
+              step="0.01"
+            />
+          </div>
+          <div class="input-group">
+            <label for="pEnH"
+              >P(E|¬H) - Likelihood (Evidence if H is false):</label
+            >
+            <input
+              type="range"
+              id="pEnHSlider"
+              min="0.01"
+              max="0.99"
+              value="0.1"
+              step="0.01"
+            />
+            <input
+              type="number"
+              id="pEnH"
+              min="0.01"
+              max="0.99"
+              value="0.1"
+              step="0.01"
+            />
+          </div>
+        </div>
+        <div class="results-container card">
+          <p>
+            <strong>P(¬H)</strong> (Prior Prob. of Not H):
+            <span id="pNotH_val"></span>
+          </p>
+          <p>
+            <strong>P(E)</strong> (Total Prob. of Evidence):
+            <span id="pE_val"></span>
+          </p>
+          <p>
+            <strong>P(H|E)</strong> (Posterior Prob. of H):
+            <span id="pHE_val" class="text-lg font-bold text-blue-600"></span>
+          </p>
+        </div>
+      </div>
+
+      <div class="right-column">
+        <div id="formula-container" class="card">
+          {/* Formula will be injected here */}
+        </div>
+        <div id="canvas-card" class="card">
+          <div id="canvas-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // p5.js sketch
+      let pHInput, pEHInput, pEnHInput;
+      let pHSlider, pEHSlider, pEnHSlider;
+
+      let pNotH_val_display, pE_val_display, pHE_val_display;
+      let formulaDisplay;
+
+      let targetCanvasSize = 400;
+      const padding = 25;
+
+      // New Color Palette (approximated from user image)
+      const colorH_hex = "#4E8A8B"; // Muted Teal/Blue-Green for P(H)
+      const colorNotH_hex = "#ECA400"; // Warm Yellow-Orange for P(¬H)
+      const colorEH_hex = "#E8743B"; // Reddish-Orange for P(E|H)
+      const colorEnH_hex = "#C0392B"; // Deep Red for P(E|¬H)
+      const highlightPHE_hex = "#3b82f6"; // Default blue for P(H|E) highlight bar and text
+
+      function setup() {
+        const canvasContainerEl = select("#canvas-container"); // The direct parent for p5 canvas
+        let initialSize = min(
+          canvasContainerEl.width,
+          canvasContainerEl.height
+        );
+        initialSize = min(initialSize, targetCanvasSize);
+        initialSize = max(initialSize, 150);
+
+        let canvas = createCanvas(initialSize, initialSize);
+        canvas.parent("canvas-container"); // Parent to the inner #canvas-container
+
+        pHInput = select("#pH");
+        pEHInput = select("#pEH");
+        pEnHInput = select("#pEnH");
+
+        pHSlider = select("#pHSlider");
+        pEHSlider = select("#pEHSlider");
+        pEnHSlider = select("#pEnHSlider");
+
+        pNotH_val_display = select("#pNotH_val");
+        pE_val_display = select("#pE_val");
+        pHE_val_display = select("#pHE_val");
+        formulaDisplay = select("#formula-container");
+
+        // Update P(H|E) text color to match highlight bar
+        pHE_val_display.style("color", highlightPHE_hex);
+        // Update slider accent color to match P(H) color
+        // Note: This might not work in all browsers for range inputs directly.
+        // For wider compatibility, custom slider styling is often needed.
+        // pHSlider.style('accent-color', colorH_hex); // Example, may not be effective
+
+        pHInput.input(updateValuesFromNumber);
+        pEHInput.input(updateValuesFromNumber);
+        pEnHInput.input(updateValuesFromNumber);
+
+        pHSlider.input(updateValuesFromSlider);
+        pEHSlider.input(updateValuesFromSlider);
+        pEnHSlider.input(updateValuesFromSlider);
+
+        noLoop();
+        redrawSketch();
+        window.addEventListener("resize", handleResize);
+      }
+
+      function handleResize() {
+        const canvasContainerEl = select("#canvas-container");
+        let newSize = min(canvasContainerEl.width, canvasContainerEl.height);
+        newSize = min(newSize, targetCanvasSize);
+        newSize = max(newSize, 150);
+
+        if (abs(width - newSize) > 2) {
+          resizeCanvas(newSize, newSize);
+          redrawSketch();
+        }
+      }
+
+      function updateValuesFromSlider() {
+        if (this.elt.id === "pHSlider") pHInput.value(this.value());
+        else if (this.elt.id === "pEHSlider") pEHInput.value(this.value());
+        else if (this.elt.id === "pEnHSlider") pEnHInput.value(this.value());
+        redrawSketch();
+      }
+
+      function updateValuesFromNumber() {
+        if (this.elt.id === "pH") pHSlider.value(this.value());
+        else if (this.elt.id === "pEH") pEHSlider.value(this.value());
+        else if (this.elt.id === "pEnH") pEnHSlider.value(this.value());
+        redrawSketch();
+      }
+
+      function redrawSketch() {
+        let pH = float(pHInput.value());
+        let pEH = float(pEHInput.value());
+        let pEnH = float(pEnHInput.value());
+
+        if (isNaN(pH) || isNaN(pEH) || isNaN(pEnH)) {
+          return;
+        }
+
+        pH = constrain(pH, 0.01, 0.99);
+        pEH = constrain(pEH, 0.01, 0.99);
+        pEnH = constrain(pEnH, 0.01, 0.99);
+
+        if (pHInput.value() !== pH.toFixed(2)) pHInput.value(pH.toFixed(2));
+        if (pEHInput.value() !== pEH.toFixed(2)) pEHInput.value(pEH.toFixed(2));
+        if (pEnHInput.value() !== pEnH.toFixed(2))
+          pEnHInput.value(pEnH.toFixed(2));
+        if (pHSlider.value() !== pH.toFixed(2)) pHSlider.value(pH.toFixed(2));
+        if (pEHSlider.value() !== pEH.toFixed(2))
+          pEHSlider.value(pEH.toFixed(2));
+        if (pEnHSlider.value() !== pEnH.toFixed(2))
+          pEnHSlider.value(pEnH.toFixed(2));
+
+        let pNotH = 1 - pH;
+        let pE_H_pH = pEH * pH;
+        let pE_nH_pNotH = pEnH * pNotH;
+        let pE = pE_H_pH + pE_nH_pNotH;
+        let pHE = pE === 0 ? 0 : pE_H_pH / pE;
+
+        pNotH_val_display.html(pNotH.toFixed(3));
+        pE_val_display.html(pE.toFixed(3));
+        pHE_val_display.html(pHE.toFixed(3));
+
+        const formulaHTML = `
+                P(H|E) &nbsp; = &nbsp;
+                <div class="formula-fraction">
+                    <div class="numerator">
+                        <span class="value" style="color: ${colorEH_hex};">${pEH.toFixed(
+          2
+        )}</span> &nbsp;&times;&nbsp;
+                        <span class="value" style="color: ${colorH_hex};">${pH.toFixed(
+          2
+        )}</span> </div>
+                    <div class="denominator">
+                        ( <span class="value" style="color: ${colorEH_hex};">${pEH.toFixed(
+          2
+        )}</span> &nbsp;&times;&nbsp;
+                        <span class="value" style="color: ${colorH_hex};">${pH.toFixed(
+          2
+        )}</span> ) &nbsp;+&nbsp;
+                        ( <span class="value" style="color: ${colorEnH_hex};">${pEnH.toFixed(
+          2
+        )}</span> &nbsp;&times;&nbsp;
+                        <span class="value" style="color: ${colorNotH_hex};">${pNotH.toFixed(
+          2
+        )}</span> ) </div>
+                </div>
+                &nbsp; = &nbsp; <span style="color:${highlightPHE_hex}; font-weight: bold;">${pHE.toFixed(
+          3
+        )}</span>
+            `;
+        formulaDisplay.html(formulaHTML);
+
+        // p5.js drawing colors from new palette
+        const p5colorH = color(colorH_hex);
+        p5colorH.setAlpha(180); // Slightly more opaque for better visibility
+        const p5colorNotH = color(colorNotH_hex);
+        p5colorNotH.setAlpha(180);
+        const p5colorEH = color(colorEH_hex);
+        p5colorEH.setAlpha(220); // More opaque for foreground elements
+        const p5colorEnH = color(colorEnH_hex);
+        p5colorEnH.setAlpha(220);
+        const p5highlightPHE = color(highlightPHE_hex);
+
+        background(255); // Canvas background is white, card provides outer color
+
+        const currentCanvasSize = width;
+        const currentPadding = currentCanvasSize * (padding / 400);
+
+        const areaX = currentPadding;
+        const areaY = currentPadding;
+        const areaWidth = currentCanvasSize - 2 * currentPadding;
+        const areaHeight = currentCanvasSize - 2 * currentPadding;
+
+        const textColor = color(31, 41, 55); // Tailwind gray-800 for text
+
+        // Draw P(H) area
+        let widthH = areaWidth * pH;
+        fill(p5colorH);
+        noStroke();
+        rect(areaX, areaY, widthH, areaHeight);
+
+        // Draw P(E|H) area within P(H)
+        let heightEH = areaHeight * pEH;
+        fill(p5colorEH);
+        rect(areaX, areaY + (areaHeight - heightEH), widthH, heightEH);
+
+        // Draw P(¬H) area
+        let widthNotH = areaWidth * pNotH;
+        fill(p5colorNotH);
+        noStroke();
+        rect(areaX + widthH, areaY, widthNotH, areaHeight);
+
+        // Draw P(E|¬H) area within P(¬H)
+        let heightEnH = areaHeight * pEnH;
+        fill(p5colorEnH);
+        rect(
+          areaX + widthH,
+          areaY + (areaHeight - heightEnH),
+          widthNotH,
+          heightEnH
+        );
+
+        textAlign(CENTER, CENTER);
+        let baseTextSize = max(8, areaWidth / 45);
+        textSize(baseTextSize);
+
+        // Labels on top of areas
+        fill(textColor); // Dark text for labels on top
+        if (widthH > areaWidth * 0.08) {
+          text(
+            `P(H)\n${pH.toFixed(2)}`,
+            areaX + widthH / 2,
+            areaY - currentPadding / 2.0
+          );
+        }
+        if (widthNotH > areaWidth * 0.08) {
+          text(
+            `P(¬H)\n${pNotH.toFixed(2)}`,
+            areaX + widthH + widthNotH / 2,
+            areaY - currentPadding / 2.0
+          );
+        }
+
+        // Labels inside colored areas - use white for contrast
+        fill(255);
+        textSize(max(7, baseTextSize * 0.85));
+        if (widthH > areaWidth * 0.06 && heightEH > areaHeight * 0.04) {
+          text(
+            `P(E|H)\n${pEH.toFixed(2)}`,
+            areaX + widthH / 2,
+            areaY + (areaHeight - heightEH) + heightEH / 2
+          );
+        }
+
+        if (widthNotH > areaWidth * 0.06 && heightEnH > areaHeight * 0.04) {
+          text(
+            `P(E|¬H)\n${pEnH.toFixed(2)}`,
+            areaX + widthH + widthNotH / 2,
+            areaY + (areaHeight - heightEnH) + heightEnH / 2
+          );
+        }
+
+        // P(H|E) Bar
+        textSize(baseTextSize);
+        const barHeight = max(10, areaHeight * 0.045);
+        const barY = currentCanvasSize - currentPadding - barHeight;
+
+        if (barY - (areaY + areaHeight) > currentPadding * 0.2) {
+          let bar_width_E_and_H = (pE_H_pH / pE) * areaWidth;
+          let bar_width_E_and_NotH = (pE_nH_pNotH / pE) * areaWidth;
+          if (pE === 0) {
+            bar_width_E_and_H = 0;
+            bar_width_E_and_NotH = 0;
+          }
+
+          // Bar parts using new palette
+          fill(p5colorEH); // P(E and H) part
+          noStroke();
+          rect(areaX, barY, bar_width_E_and_H, barHeight);
+
+          fill(p5colorEnH); // P(E and ¬H) part
+          noStroke();
+          rect(
+            areaX + bar_width_E_and_H,
+            barY,
+            bar_width_E_and_NotH,
+            barHeight
+          );
+
+          fill(textColor);
+          textAlign(CENTER, BOTTOM);
+          text(
+            `P(H|E) = ${pHE.toFixed(3)}`,
+            areaX + areaWidth / 2,
+            barY - currentPadding * 0.15
+          );
+
+          stroke(p5highlightPHE); // Highlight color for bracket
+          strokeWeight(max(1, areaWidth / 350));
+          const bracketY = barY + barHeight + max(1, areaHeight * 0.003);
+          const bracketHeight = max(3, areaHeight * 0.007);
+          line(areaX, bracketY, areaX + bar_width_E_and_H, bracketY);
+          line(areaX, bracketY, areaX, bracketY + bracketHeight);
+          line(
+            areaX + bar_width_E_and_H,
+            bracketY,
+            areaX + bar_width_E_and_H,
+            bracketY + bracketHeight
+          );
+
+          noStroke();
+          fill(p5highlightPHE); // Highlight color for text
+          textAlign(CENTER, TOP);
+          textSize(max(7, baseTextSize * 0.8));
+          text(
+            `This part is P(H|E)`,
+            areaX + bar_width_E_and_H / 2,
+            bracketY + bracketHeight + max(1, areaHeight * 0.002)
+          );
+        } else {
+          fill(textColor);
+          textAlign(CENTER, BOTTOM);
+          text(
+            `P(H|E) = ${pHE.toFixed(3)}`,
+            currentCanvasSize / 2,
+            currentCanvasSize - currentPadding / 3
+          );
+        }
+      }
+    </script>
+  </body>
+</html>
